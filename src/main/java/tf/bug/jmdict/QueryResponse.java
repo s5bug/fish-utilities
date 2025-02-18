@@ -8,11 +8,13 @@ import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionFollowupCreateSpec;
 import discord4j.core.spec.InteractionReplyEditSpec;
+import discord4j.discordjson.possible.Possible;
 import org.apache.lucene.document.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiFunction;
 
@@ -127,7 +129,8 @@ public final record QueryResponse(
                 InteractionReplyEditSpec.builder();
 
         b.addEmbed(this.makeEmbed());
-        if (withActions) b.addComponent(this.makeActionRow(makeButtonId));
+        if (withActions) b.componentsOrNull(this.makeActionRow(makeButtonId));
+        else b.componentsOrNull();
 
         return b.build();
     }
