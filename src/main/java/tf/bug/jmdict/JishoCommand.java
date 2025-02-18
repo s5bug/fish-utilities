@@ -2,20 +2,38 @@ package tf.bug.jmdict;
 
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.Embed;
+import discord4j.core.spec.EmbedCreateFields;
+import discord4j.core.spec.EmbedCreateSpec;
+import discord4j.core.spec.InteractionFollowupCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAmount;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import discord4j.discordjson.json.EmbedFieldData;
+import io.netty.buffer.ByteBufOutputStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.StoredFields;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
+import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import tf.bug.Command;
 
@@ -74,88 +92,151 @@ public final class JishoCommand implements Command {
         return a.then(event.editReply(":(")).then();
     }
 
-    private static final Pattern HAN_PATTERN =
-            Pattern.compile("\\p{sc=Han}", Pattern.UNICODE_CHARACTER_CLASS);
-    private static final Pattern ALL_KANA_PATTERN =
-            Pattern.compile(
-                    "(?:\\p{sc=Katakana}|\\p{sc=Hiragana}|\\p{sc=Kana}|[*?])+",
-                    Pattern.UNICODE_CHARACTER_CLASS | Pattern.DOTALL
-            );
-    private static final Pattern NON_SIMPLE_PATTERN =
-            Pattern.compile("[*?]");
+    private static final int PAGE_SIZE = 3;
+
+    private @Nullable TopDocs getNonEmptyResults(IndexSearcher is, QueryChain[] refChain) throws IOException {
+        while(refChain[0] != null) {
+            TopDocs td = is.search(refChain[0].luceneQuery(), 1);
+            if(td.totalHits.value() > 0L) return td;
+
+            refChain[0] = refChain[0].fallback();
+        }
+        return null;
+    }
 
     public Mono<Void> followup(ChatInputInteractionEvent event) {
         String q = event.getOptionAsString("query").get();
 
-        String row;
-        if(HAN_PATTERN.matcher(q).find()) {
-            row = "keb";
-        } else if(ALL_KANA_PATTERN.matcher(q).matches()) {
-            row = "reb";
-        } else {
-            row = "sense";
-        }
+        QueryChain chain = QueryChainParser.parse(q);
 
-        Term term;
-        if(NON_SIMPLE_PATTERN.matcher(q).find()) {
-            term = new Term(row, q);
-        } else {
-            term = new Term(row, q + "*");
-        }
+        final ArrayList<Document> resultsReified;
 
-        Query query = new WildcardQuery(term);
+        try(IndexReader ir = DirectoryReader.open(this.jmdict)) {
+            IndexSearcher is = new IndexSearcher(ir);
+            QueryChain[] refChain = new QueryChain[] { chain};
+            @Nullable TopDocs results = this.getNonEmptyResults(is, refChain);
+            chain = refChain[0];
+            StoredFields sf = is.storedFields();
 
-        IndexReader ir;
-        try {
-            ir = DirectoryReader.open(this.jmdict);
-        } catch (IOException e) {
-            // TODO make this show an error to the user
-            throw new RuntimeException(e);
-        }
+            if(results == null) {
+                EmbedCreateSpec embed = EmbedCreateSpec.builder()
+                        .description("No results found for query `%s`".formatted(q))
+                        .build();
+                return event.createFollowup(InteractionFollowupCreateSpec.builder()
+                        .addEmbed(embed)
+                        .build()).then();
+            }
 
-        IndexSearcher is = new IndexSearcher(ir);
-        TopDocs td;
-        try {
-            // TODO paginate with modal buttons
-            td = is.search(query, 10);
-        } catch (IOException e) {
-            // TODO show an error to the user
-            throw new RuntimeException(e);
-        }
+            resultsReified = new ArrayList<>();
 
-        // TODO paginate with modal buttons
-        ArrayList<Document> docs = new ArrayList<>();
-        StoredFields sf = null;
-        try {
-            sf = is.storedFields();
-            for(ScoreDoc sd : td.scoreDocs) {
-                docs.add(sf.document(sd.doc));
+            for(ScoreDoc sd : results.scoreDocs) {
+                resultsReified.add(sf.document(sd.doc));
+            }
+
+            TopDocs rest = is.searchAfter(
+                    results.scoreDocs[results.scoreDocs.length - 1],
+                    chain.luceneQuery(),
+                    (int) results.totalHits.value()
+            );
+
+            for (ScoreDoc sd : rest.scoreDocs) {
+                resultsReified.add(sf.document(sd.doc));
             }
         } catch (IOException e) {
-            // TODO throw an error message
-            throw new RuntimeException(e);
+            ByteArrayOutputStream grabExceptionPrint = new ByteArrayOutputStream();
+            PrintStream ps = new PrintStream(grabExceptionPrint, false, StandardCharsets.UTF_8);
+            e.printStackTrace(ps);
+            ps.close();
+            EmbedCreateSpec embed = EmbedCreateSpec.builder()
+                    .description("Error trying to execute query: ```\n%s\n```"
+                            .formatted(grabExceptionPrint.toString(StandardCharsets.UTF_8)))
+                    .build();
+            return event.createFollowup(InteractionFollowupCreateSpec.builder()
+                    .addEmbed(embed)
+                    .build()).then();
         }
 
-        // TODO build an embed
-        StringBuilder result = new StringBuilder();
-        for(Document doc : docs) {
-            result.append("- **");
-            String canonical = doc.get("keb");
-            result.append(canonical);
-            result.append("**");
-            String[] senses = doc.getValues("sense");
-            for(int i = 0; i < senses.length; i++) {
-                result.append("\n  ");
-                result.append(1 + i);
-                result.append(". ");
-                result.append(senses[i]);
+        // TODO paginated result scrolling with buttons
+        ModalStateHolder stateHolder = new ModalStateHolder(q, resultsReified);
+        return stateHolder.initializeOn(event);
+    }
+
+    private static final Duration TIMEOUT =
+            Duration.of(5L, ChronoUnit.MINUTES);
+
+    public static final class ModalStateHolder {
+        private final String query;
+        private final List<Document> entries;
+        private final AtomicInteger page;
+        private final int totalPages;
+        private final AtomicReference<Instant> timeToDie;
+
+        private ModalStateHolder(String query, List<Document> entries) {
+            this.query = query;
+            this.entries = entries;
+            this.page = new AtomicInteger(0);
+            this.totalPages = Math.ceilDiv(this.entries.size(), PAGE_SIZE);
+            this.timeToDie = new AtomicReference<>(Instant.now().plus(TIMEOUT));
+        }
+
+        public EmbedCreateSpec makeEmbed() {
+            int page = this.page.get();
+            int start = PAGE_SIZE * page;
+            int end = start + PAGE_SIZE;
+
+            ArrayList<EmbedCreateFields.Field> fields = new ArrayList<>();
+            for(int i = start; i < end && i < this.entries.size(); i++) {
+                Document doc = this.entries.get(i);
+                // TODO consider reb exclusions
+                String[] writings = doc.getValues("keb");
+                String[] readings = doc.getValues("reb");
+                String[] senses = doc.getValues("sense");
+
+                StringBuilder title = new StringBuilder();
+                for(int j = 0; j < writings.length; j++) {
+                    title.append(writings[j]);
+                    title.append(", ");
+                }
+                title.setLength(title.length() - 2);
+                if(readings.length > 0) {
+                    title.append(" (");
+                    for(int j = 0; j < readings.length; j++) {
+                        title.append(readings[j]);
+                        title.append(", ");
+                    }
+                    title.setLength(title.length() - 2);
+                    title.append(")");
+                }
+
+                StringBuilder description = new StringBuilder();
+                for(int j = 0; j < senses.length; j++) {
+                    description.append(j);
+                    description.append(". ");
+                    description.append(senses[j]);
+                    description.append("\n");
+                }
+
+                fields.add(EmbedCreateFields.Field.of(
+                        title.toString(),
+                        description.toString(),
+                        false
+                ));
             }
-            result.append("\n");
+
+            return EmbedCreateSpec.builder()
+                    .title("`%s` (Page %d/%d)".formatted(
+                            this.query,
+                            1 + page,
+                            this.totalPages
+                    ))
+                    .addAllFields(fields)
+                    .build();
         }
 
-        // TODO create a timeout(?) paginated state
-        // It's probably not that hard to store the state in the embed
-        // Page can be parsed from embed, query can be stored in button IDs
-        return event.createFollowup(result.toString()).then();
+        public Mono<Void> initializeOn(ChatInputInteractionEvent event) {
+            return event.createFollowup(InteractionFollowupCreateSpec.builder()
+                    .addEmbed(this.makeEmbed())
+                    .build()).then();
+        }
     }
 }

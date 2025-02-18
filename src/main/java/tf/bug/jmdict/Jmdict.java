@@ -58,8 +58,8 @@ public final class Jmdict {
 
     private static final Lazy<Analyzer> JMDICT_ANALYZER = new Lazy<>(() -> {
         HashMap<String, Analyzer> analyzers = new HashMap<>();
-        analyzers.put("keb", new KeywordAnalyzer());
-        analyzers.put("reb", new KeywordAnalyzer());
+        analyzers.put("keb", new JapaneseNormalAnalyzer());
+        analyzers.put("reb", new JapaneseNormalAnalyzer());
         analyzers.put("sense", new EnglishAnalyzer());
 
         return new PerFieldAnalyzerWrapper(new StandardAnalyzer(), analyzers);
@@ -84,6 +84,7 @@ public final class Jmdict {
         p.parse(decompress, new SAXHandler(writer));
     }
 
+    // TODO handle tags and reading exclusions
     private static final class SAXHandler extends DefaultHandler {
         private final IndexWriter writer;
         @Nullable private Document inProgress;
