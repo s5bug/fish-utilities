@@ -1,6 +1,7 @@
 package tf.bug;
 
 import discord4j.core.DiscordClient;
+import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import java.io.IOException;
@@ -62,10 +63,13 @@ public class Main {
         final ArrayList<ApplicationCommandRequest> globalCommands = new ArrayList<>(commandList.size());
         final HashMap<String, Command> commandMap = new HashMap<>();
         commandList.forEach(c -> {
-            ApplicationCommandRequest r = c.getRequest();
+            ApplicationCommandRequest r = c.register(c.id());
+            if(!c.id().equals(r.name()))
+                throw new IllegalArgumentException("Command %s has a name mismatching its ID".formatted(c.id()));
             globalCommands.add(r);
-            commandMap.put(r.name(), c);
+            commandMap.put(c.id(), c);
         });
+
 
         Mono<Void> login = client.withGateway(gateway -> {
             return Mono.when(
@@ -74,9 +78,15 @@ public class Main {
                                     .bulkOverwriteGlobalApplicationCommand(appId, globalCommands).then()),
                     gateway.on(ChatInputInteractionEvent.class, event -> {
                         Command cmd = commandMap.get(event.getCommandName());
-                        if(cmd != null) return cmd.execute(gateway, event);
+                        if(cmd != null) return cmd.handleSlashCommand(gateway, event);
                         else return Mono.empty();
-                    })
+                    }).then(),
+                    gateway.on(ButtonInteractionEvent.class, event -> {
+                        String namespace = event.getCustomId().substring(0, event.getCustomId().indexOf("-"));
+                        Command cmd = commandMap.get(namespace);
+                        if(cmd != null) return cmd.handleButton(gateway, event);
+                        else return Mono.empty();
+                    }).then()
             );
         });
 

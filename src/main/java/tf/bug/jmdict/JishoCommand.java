@@ -1,11 +1,12 @@
 package tf.bug.jmdict;
 
+import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
+import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import discord4j.core.object.Embed;
-import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionFollowupCreateSpec;
+import discord4j.core.spec.InteractionReplyEditSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 
@@ -16,17 +17,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAmount;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
-import discord4j.discordjson.json.EmbedFieldData;
-import io.netty.buffer.ByteBufOutputStream;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -37,16 +30,23 @@ import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import tf.bug.Command;
 
-public final class JishoCommand implements Command {
+public final class JishoCommand extends Command {
+    public static final String ID = "jisho";
+
     private final Directory jmdict;
     public JishoCommand(Directory jmdict) {
         this.jmdict = jmdict;
     }
 
     @Override
-    public ApplicationCommandRequest getRequest() {
+    public String id() {
+        return JishoCommand.ID;
+    }
+
+    @Override
+    public ApplicationCommandRequest register(String id) {
         ApplicationCommandRequest r = ApplicationCommandRequest.builder()
-                .name("jisho")
+                .name(id)
                 .description("Display information for Japanese query")
                 .addOption(ApplicationCommandOptionData.builder()
                         .name("query")
@@ -79,8 +79,31 @@ public final class JishoCommand implements Command {
         return r;
     }
 
+    private QueryResponse updateInteraction(String data, QueryResponse oldResponse) {
+        if(oldResponse == null) return null;
+        else {
+            int page = Integer.parseInt(data) - 1;
+            Instant timeToDie = Instant.now().plus(TIMEOUT);
+            return oldResponse.withPage(page, timeToDie);
+        }
+    }
+
     @Override
-    public Mono<Void> execute(GatewayDiscordClient client, ChatInputInteractionEvent event) {
+    public Mono<Void> handleButton(GatewayDiscordClient client, ButtonInteractionEvent event) {
+        String data = this.dataOfButton(event.getCustomId());
+        UUID target = this.uuidOfButton(event.getCustomId());
+        QueryResponse newResponse =
+                    this.interactionMap.compute(target, (_, qr) -> updateInteraction(data, qr));
+
+            if(newResponse != null) {
+                this.interactionMessages.putIfAbsent(target, event.getMessageId());
+                return this.edit(event, newResponse);
+            }
+            else return Mono.empty();
+    }
+
+    @Override
+    public Mono<Void> handleSlashCommand(GatewayDiscordClient client, ChatInputInteractionEvent event) {
         var a = event.deferReply();
         Mono<Void> b;
         try {
@@ -92,8 +115,6 @@ public final class JishoCommand implements Command {
         return a.then(event.editReply(":(")).then();
     }
 
-    private static final int PAGE_SIZE = 3;
-
     private @Nullable TopDocs getNonEmptyResults(IndexSearcher is, QueryChain[] refChain) throws IOException {
         while(refChain[0] != null) {
             TopDocs td = is.search(refChain[0].luceneQuery(), 1);
@@ -103,6 +124,12 @@ public final class JishoCommand implements Command {
         }
         return null;
     }
+
+    private final ConcurrentHashMap<UUID, QueryResponse> interactionMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Snowflake> interactionMessages = new ConcurrentHashMap<>();
+
+    private static final Duration TIMEOUT =
+            Duration.of(5L, ChronoUnit.MINUTES);
 
     public Mono<Void> followup(ChatInputInteractionEvent event) {
         String q = event.getOptionAsString("query").get();
@@ -158,87 +185,62 @@ public final class JishoCommand implements Command {
                     .build()).then();
         }
 
-        // TODO paginated result scrolling with buttons
-        ModalStateHolder stateHolder = new ModalStateHolder(q, resultsReified);
-        return stateHolder.initializeOn(event);
+        UUID entryUuid = UUID.randomUUID();
+        Instant timeToDie = Instant.now().plus(TIMEOUT);
+        QueryResponse initialResponse = new QueryResponse(
+                event,
+                entryUuid,
+                q,
+                resultsReified,
+                0,
+                Math.ceilDiv(resultsReified.size(), QueryResponse.PAGE_SIZE),
+                timeToDie
+        );
+
+        interactionMap.put(entryUuid, initialResponse);
+
+        return event.createFollowup(initialResponse.makeInitialFollowup(this::makeButtonId))
+                .flatMap(msg -> {
+                    interactionMessages.put(entryUuid, msg.getId());
+                    return Mono.empty();
+                })
+                .then(this.tryToDie(entryUuid));
     }
 
-    private static final Duration TIMEOUT =
-            Duration.of(5L, ChronoUnit.MINUTES);
+    Mono<Void> edit(ButtonInteractionEvent event, QueryResponse newResponse) {
+        InteractionReplyEditSpec s = newResponse.makeReplyEdit(this::makeButtonId, true);
 
-    public static final class ModalStateHolder {
-        private final String query;
-        private final List<Document> entries;
-        private final AtomicInteger page;
-        private final int totalPages;
-        private final AtomicReference<Instant> timeToDie;
+        return newResponse.event().editFollowup(event.getMessageId(), s)
+                .then(event.deferEdit());
+    }
 
-        private ModalStateHolder(String query, List<Document> entries) {
-            this.query = query;
-            this.entries = entries;
-            this.page = new AtomicInteger(0);
-            this.totalPages = Math.ceilDiv(this.entries.size(), PAGE_SIZE);
-            this.timeToDie = new AtomicReference<>(Instant.now().plus(TIMEOUT));
-        }
-
-        public EmbedCreateSpec makeEmbed() {
-            int page = this.page.get();
-            int start = PAGE_SIZE * page;
-            int end = start + PAGE_SIZE;
-
-            ArrayList<EmbedCreateFields.Field> fields = new ArrayList<>();
-            for(int i = start; i < end && i < this.entries.size(); i++) {
-                Document doc = this.entries.get(i);
-                // TODO consider reb exclusions
-                String[] writings = doc.getValues("keb");
-                String[] readings = doc.getValues("reb");
-                String[] senses = doc.getValues("sense");
-
-                StringBuilder title = new StringBuilder();
-                for(int j = 0; j < writings.length; j++) {
-                    title.append(writings[j]);
-                    title.append(", ");
-                }
-                title.setLength(title.length() - 2);
-                if(readings.length > 0) {
-                    title.append(" (");
-                    for(int j = 0; j < readings.length; j++) {
-                        title.append(readings[j]);
-                        title.append(", ");
+    Mono<Void> tryToDie(UUID interaction) {
+        QueryResponse retrieved = interactionMap.get(interaction);
+        if(retrieved == null) return Mono.empty();
+        else {
+            Instant deathTime = retrieved.timeToDie();
+            Instant now = Instant.now();
+            if(now.isAfter(deathTime)) {
+                InteractionReplyEditSpec withoutButtons =
+                        retrieved.makeReplyEdit(this::makeButtonId, false);
+                return retrieved.event().editFollowup(
+                        this.interactionMessages.get(retrieved.uuid()),
+                        withoutButtons
+                ).flatMap(msg -> {
+                    QueryResponse raced = interactionMap.compute(interaction, (_, qr) -> {
+                        if(Objects.equals(qr, retrieved)) return null;
+                        else return qr;
+                    });
+                    if(raced == null) {
+                        interactionMessages.remove(retrieved.uuid());
+                        return Mono.empty();
                     }
-                    title.setLength(title.length() - 2);
-                    title.append(")");
-                }
-
-                StringBuilder description = new StringBuilder();
-                for(int j = 0; j < senses.length; j++) {
-                    description.append(j);
-                    description.append(". ");
-                    description.append(senses[j]);
-                    description.append("\n");
-                }
-
-                fields.add(EmbedCreateFields.Field.of(
-                        title.toString(),
-                        description.toString(),
-                        false
-                ));
+                    else return tryToDie(interaction);
+                });
+            } else {
+                return Mono.delay(Duration.between(now, deathTime))
+                        .then(Mono.defer(() -> tryToDie(interaction)));
             }
-
-            return EmbedCreateSpec.builder()
-                    .title("`%s` (Page %d/%d)".formatted(
-                            this.query,
-                            1 + page,
-                            this.totalPages
-                    ))
-                    .addAllFields(fields)
-                    .build();
-        }
-
-        public Mono<Void> initializeOn(ChatInputInteractionEvent event) {
-            return event.createFollowup(InteractionFollowupCreateSpec.builder()
-                    .addEmbed(this.makeEmbed())
-                    .build()).then();
         }
     }
 }

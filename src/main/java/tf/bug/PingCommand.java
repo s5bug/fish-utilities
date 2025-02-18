@@ -1,24 +1,30 @@
 package tf.bug;
 
-import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import discord4j.core.object.command.ApplicationCommandContexts;
 import discord4j.discordjson.json.ApplicationCommandRequest;
-import discord4j.rest.service.ApplicationService;
-import java.util.Arrays;
+
 import java.util.List;
 import java.util.Map;
+
+import discord4j.store.api.util.Lazy;
 import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 
-public enum PingCommand implements Command {
-    INSTANCE;
+public final class PingCommand extends Command {
+    public static final Lazy<PingCommand> INSTANCE =
+            new Lazy<>(PingCommand::new);
+
+    private PingCommand() {}
+
+    public String id() {
+        return "ping";
+    }
 
     @Override
-    public ApplicationCommandRequest getRequest() {
+    public ApplicationCommandRequest register(String id) {
         ApplicationCommandRequest r = ApplicationCommandRequest.builder()
-                .name("ping")
+                .name(id)
                 .description("Test command")
                 .nameLocalizationsOrNull(Map.of(
                         "en-US", "ping",
@@ -37,7 +43,7 @@ public enum PingCommand implements Command {
     }
 
     @Override
-    public Mono<Void> execute(final GatewayDiscordClient client, final ChatInputInteractionEvent event) {
+    public Mono<Void> handleSlashCommand(final GatewayDiscordClient client, final ChatInputInteractionEvent event) {
         String reply = switch(event.getInteraction().getUserLocale()) {
             case "en-US" -> "Pong!";
             case "ja" -> "ポン！";
