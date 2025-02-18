@@ -133,6 +133,8 @@ public final class JishoCommand implements Command {
                 resultsReified.add(sf.document(sd.doc));
             }
 
+            // TODO replace this with further page searches on request
+            // TODO don't close ir until timeout
             TopDocs rest = is.searchAfter(
                     results.scoreDocs[results.scoreDocs.length - 1],
                     chain.luceneQuery(),
