@@ -117,7 +117,7 @@ public final class JishoCommand extends Command {
 
     private @Nullable TopDocs getNonEmptyResults(IndexSearcher is, QueryChain[] refChain) throws IOException {
         while(refChain[0] != null) {
-            TopDocs td = is.search(refChain[0].luceneQuery(), 1);
+            TopDocs td = is.search(refChain[0].luceneQuery(), 1, refChain[0].bestSort());
             if(td.totalHits.value() > 0L) return td;
 
             refChain[0] = refChain[0].fallback();
@@ -140,7 +140,7 @@ public final class JishoCommand extends Command {
 
         try(IndexReader ir = DirectoryReader.open(this.jmdict)) {
             IndexSearcher is = new IndexSearcher(ir);
-            QueryChain[] refChain = new QueryChain[] { chain};
+            QueryChain[] refChain = new QueryChain[] { chain };
             @Nullable TopDocs results = this.getNonEmptyResults(is, refChain);
             chain = refChain[0];
             StoredFields sf = is.storedFields();

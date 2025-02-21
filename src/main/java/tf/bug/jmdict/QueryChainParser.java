@@ -4,11 +4,9 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.BytesTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
+import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.PhraseQuery;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.WildcardQuery;
+import org.apache.lucene.search.*;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 
@@ -36,6 +34,28 @@ public final class QueryChainParser {
             );
     private static final Pattern NON_SIMPLE_PATTERN =
             Pattern.compile("[*?]");
+
+    // TODO sort KEB searches by
+    // 1. length of keb with exact match
+    // 2. commonality of entry
+    // 3. Lucene score
+    private static final Sort KEB_SORT =
+            new Sort(SortField.FIELD_SCORE);
+
+    // TODO sort REB searches by
+    // 1. length of reb with exact match
+    // 2. commonality of entry
+    // 3. Lucene score
+    private static final Sort REB_SORT =
+            new Sort(SortField.FIELD_SCORE);
+
+    // TODO sort Gloss searches by
+    // 1. exact match trumps all
+    // 2. <pri> matches
+    // 3. commonality of entry
+    // 4. Lucene score
+    private static final Sort GLOSS_SORT =
+            new Sort(SortField.FIELD_SCORE);
 
     /// Follow the following rules:
     /// - Trim the query
@@ -94,16 +114,16 @@ public final class QueryChainParser {
 
         if(HAN_PATTERN.matcher(humanQuery).find()) {
             Term term = new Term("keb", kebQuery);
-            return new QueryChain(jpQueryConstructor.apply(term), null);
+            return new QueryChain(jpQueryConstructor.apply(term), KEB_SORT, null);
         } else {
             boolean latinMatches = LATIN_PATTERN.matcher(humanQuery).find();
             boolean kanaMatches = KANA_PATTERN.matcher(humanQuery).find();
             if(kanaMatches && !latinMatches) {
                 Term term = new Term("reb", rebQuery);
-                return new QueryChain(jpQueryConstructor.apply(term), null);
+                return new QueryChain(jpQueryConstructor.apply(term), REB_SORT, null);
             } else {
                 ArrayList<String> senseTerms = new ArrayList<>();
-                try(TokenStream queryStream = Jmdict.getJmdictAnalyzer().tokenStream("sense", humanQuery)) {
+                try(TokenStream queryStream = Jmdict.getJmdictAnalyzer().tokenStream("gloss", humanQuery)) {
                     CharTermAttribute termAttribute = queryStream.addAttribute(CharTermAttribute.class);
 
                     queryStream.reset();
@@ -117,12 +137,13 @@ public final class QueryChainParser {
                 }
 
                 String[] arr = new String[senseTerms.size()];
-                Query senseQuery = enQueryConstructor.apply("sense", senseTerms.toArray(arr));
+                Query senseQuery = enQueryConstructor.apply("gloss", senseTerms.toArray(arr));
                 Term kebTerm = new Term("keb", kebQuery);
                 // TODO perform romanized reb search
                 return new QueryChain(
                         jpQueryConstructor.apply(kebTerm),
-                        new QueryChain(senseQuery, null)
+                        KEB_SORT,
+                        new QueryChain(senseQuery, GLOSS_SORT, null)
                 );
             }
         }
