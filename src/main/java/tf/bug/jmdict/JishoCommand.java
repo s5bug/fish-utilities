@@ -117,7 +117,12 @@ public final class JishoCommand extends Command {
 
     private @Nullable TopDocs getNonEmptyResults(IndexSearcher is, QueryChain[] refChain) throws IOException {
         while(refChain[0] != null) {
-            TopDocs td = is.search(refChain[0].luceneQuery(), 1, refChain[0].bestSort());
+            TopDocs td = is.search(
+                    refChain[0].luceneQuery(),
+                    1,
+                    refChain[0].bestSort(),
+                    true
+            );
             if(td.totalHits.value() > 0L) return td;
 
             refChain[0] = refChain[0].fallback();
@@ -165,7 +170,9 @@ public final class JishoCommand extends Command {
             TopDocs rest = is.searchAfter(
                     results.scoreDocs[results.scoreDocs.length - 1],
                     chain.luceneQuery(),
-                    (int) results.totalHits.value()
+                    (int) results.totalHits.value(),
+                    chain.bestSort(),
+                    true
             );
 
             for (ScoreDoc sd : rest.scoreDocs) {
