@@ -1,4 +1,4 @@
-package tf.bug.jmdict;
+package tf.bug.japanese;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.LowerCaseFilter;

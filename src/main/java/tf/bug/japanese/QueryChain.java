@@ -1,4 +1,4 @@
-package tf.bug.jmdict;
+package tf.bug.japanese;
 
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;

@@ -1,4 +1,4 @@
-package tf.bug.jmdict;
+package tf.bug.japanese.jmdict;
 
 import org.jetbrains.annotations.Contract;
 import org.xml.sax.Attributes;

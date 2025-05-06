@@ -1,18 +1,26 @@
-package tf.bug.jmdict;
+package tf.bug.japanese.jmdict;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Set;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
 
 import java.io.IOException;
+import tf.bug.japanese.freqcc100.FreqCc100;
 
 // TODO handle tags and reading exclusions
-final class JmdictLuceneVisitor extends JmdictVisitor {
+public final class JmdictLuceneVisitor extends JmdictVisitor {
     private final IndexWriter writer;
+    private final FreqCc100 frequencyInfo;
+    private final Map<String, Set<FreqCc100.Entry>> kebLookup;
     private Document document;
     private final StringBuilder senseColumnBuilder;
 
-    public JmdictLuceneVisitor(IndexWriter writer) {
+    public JmdictLuceneVisitor(IndexWriter writer, FreqCc100 frequencyInfo) {
         this.writer = writer;
+        this.frequencyInfo = frequencyInfo;
+        this.kebLookup = this.frequencyInfo.kebLookupMap();
         this.document = null;
         this.senseColumnBuilder = new StringBuilder();
     }
@@ -35,6 +43,36 @@ final class JmdictLuceneVisitor extends JmdictVisitor {
     @Override
     public void exitEntry() {
         try {
+            int frequency = this.frequencyInfo.entries().size();
+            String[] kebs = this.document.getValues("keb");
+            if(kebs.length != 0) {
+                Set<String> rebs = Set.of(this.document.getValues("reb"));
+                for(String keb : kebs) {
+                    Set<FreqCc100.Entry> entries = this.kebLookup.get(keb);
+                    if(entries == null) continue;
+
+                    for(FreqCc100.Entry entry : entries) {
+                        if(entry.reb() != null && !rebs.contains(entry.reb())) continue;
+
+                        frequency = Math.min(entry.frequency(), frequency);
+                    }
+                }
+            } else {
+                String[] rebs = this.document.getValues("reb");
+                for(String reb : rebs) {
+                    // If an entry has no `keb`, it is Han-less in FreqCc100
+                    Set<FreqCc100.Entry> entries = this.kebLookup.get(reb);
+
+                    if(entries == null) continue;
+
+                    for(FreqCc100.Entry entry : entries) {
+                        frequency = Math.min(entry.frequency(), frequency);
+                    }
+                }
+            }
+
+            this.document.add(new NumericDocValuesField("frequency", frequency));
+
             this.writer.addDocument(this.document);
             this.document = null;
         } catch (IOException e) {

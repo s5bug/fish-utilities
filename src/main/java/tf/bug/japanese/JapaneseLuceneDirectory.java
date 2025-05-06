@@ -1,13 +1,13 @@
-package tf.bug.jmdict;
+package tf.bug.japanese;
 
+import com.fasterxml.jackson.core.Version;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import discord4j.store.api.util.Lazy;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.HashMap;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -17,31 +17,31 @@ import org.apache.lucene.analysis.core.SimpleAnalyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field;
-import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.xml.sax.SAXException;
+import tf.bug.japanese.freqcc100.FreqCc100;
+import tf.bug.japanese.jmdict.JmdictLuceneVisitor;
+import tf.bug.japanese.jmdict.JmdictVisitorSAXAdapter;
 
-public final class Jmdict {
-    private final HttpClient client;
-    private final URI jmdictEGzUri;
+public final class JapaneseLuceneDirectory {
+    private final InputStream jmdictEGz;
+    private final InputStream freqCc100;
 
-    public Jmdict(HttpClient client, URI jmdictEGzUri) {
-        this.client = client;
-        this.jmdictEGzUri = jmdictEGzUri;
+    public JapaneseLuceneDirectory(InputStream jmdictEGz, InputStream freqCc100) {
+        this.jmdictEGz = jmdictEGz;
+        this.freqCc100 = freqCc100;
     }
 
-    public static Directory downloadAndSaturateInMemoryStore(HttpClient client, URI jmdictEGzUri) throws IOException, ParserConfigurationException, InterruptedException, SAXException {
+    public static Directory of(InputStream jmdictEGz, InputStream freqCc100) throws IOException, ParserConfigurationException, SAXException {
         Directory result = new ByteBuffersDirectory();
-        Analyzer analyzer = Jmdict.getJmdictAnalyzer();
+        Analyzer analyzer = JapaneseLuceneDirectory.getJmdictAnalyzer();
         IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
         IndexWriter writer = new IndexWriter(result, iwc);
 
-        Jmdict self = new Jmdict(client, jmdictEGzUri);
+        JapaneseLuceneDirectory self = new JapaneseLuceneDirectory(jmdictEGz, freqCc100);
         self.saturate(writer);
 
         writer.close();
@@ -64,17 +64,20 @@ public final class Jmdict {
     }
 
     // TODO rethrow exceptions with domain-specific exceptions
-    public void saturate(IndexWriter writer) throws IOException, InterruptedException, ParserConfigurationException, SAXException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(this.jmdictEGzUri)
-                .method("GET", HttpRequest.BodyPublishers.noBody())
-                .build();
-        HttpResponse<InputStream> gz =
-                this.client.send(request, _ -> HttpResponse.BodySubscribers.ofInputStream());
-        InputStream decompress = new GZIPInputStream(gz.body());
+    public void saturate(IndexWriter writer) throws IOException, ParserConfigurationException, SAXException {
+        ObjectMapper mapper = new ObjectMapper();
+        SimpleModule entryDeserializerModule = new SimpleModule(
+                "FreqCc100EntryDeserializer",
+                new Version(1, 0, 0, null, null, null)
+        );
+        entryDeserializerModule.addDeserializer(FreqCc100.Entry.class, new FreqCc100.Entry.Deserializer());
+        mapper.registerModule(entryDeserializerModule);
+        List<FreqCc100.Entry> frequencyInfo = mapper.readerForListOf(FreqCc100.Entry.class).readValue(this.freqCc100);
+
+        InputStream jmDict = new GZIPInputStream(this.jmdictEGz);
         SAXParserFactory pf = SAXParserFactory.newInstance();
         // TODO check schema
         SAXParser p = pf.newSAXParser();
-        p.parse(decompress, new JmdictVisitorSAXAdapter(new JmdictLuceneVisitor(writer)));
+        p.parse(jmDict, new JmdictVisitorSAXAdapter(new JmdictLuceneVisitor(writer, new FreqCc100(frequencyInfo))));
     }
 }

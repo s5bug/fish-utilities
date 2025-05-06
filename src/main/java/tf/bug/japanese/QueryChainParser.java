@@ -1,16 +1,11 @@
-package tf.bug.jmdict;
+package tf.bug.japanese;
 
 import java.util.List;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.BytesTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
-import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.queries.function.FunctionScoreQuery;
 import org.apache.lucene.search.*;
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.BytesRefBuilder;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -42,7 +37,7 @@ public final class QueryChainParser {
     // 2. commonality of entry (int)
     // 3. Lucene score
     private static final Sort KEB_SORT =
-            new Sort(SortField.FIELD_SCORE);
+            new Sort(SortField.FIELD_SCORE, new SortField("frequency", SortField.Type.INT));
 
     private static Query generateKebPrefixQuery(BytesRef kebPrefix) {
         Query exactMatch = new BoostQuery(new TermQuery(new Term("keb", kebPrefix)), 10.0f);
@@ -60,7 +55,7 @@ public final class QueryChainParser {
     // 2. commonality of entry (int)
     // 3. Lucene score
     private static final Sort REB_SORT =
-            new Sort(SortField.FIELD_SCORE);
+            new Sort(SortField.FIELD_SCORE, new SortField("frequency", SortField.Type.INT));
 
     private static Query generateRebPrefixQuery(BytesRef rebPrefix) {
         Query exactMatch = new BoostQuery(new TermQuery(new Term("reb", rebPrefix)), 10.0f);
@@ -79,7 +74,7 @@ public final class QueryChainParser {
     // 3. commonality of entry (int)
     // 4. Lucene score
     private static final Sort GLOSS_SORT =
-            new Sort(SortField.FIELD_SCORE);
+            new Sort(SortField.FIELD_SCORE, new SortField("frequency", SortField.Type.INT));
 
     /// Follow the following rules:
     /// - Trim the query
@@ -124,8 +119,8 @@ public final class QueryChainParser {
             rebQueryConstructor = QueryChainParser::generateRebPrefixQuery;
         }
 
-        BytesRef kebQuery = Jmdict.getJmdictAnalyzer().normalize("keb", humanQuery);
-        BytesRef rebQuery = Jmdict.getJmdictAnalyzer().normalize("reb", humanQuery);
+        BytesRef kebQuery = JapaneseLuceneDirectory.getJmdictAnalyzer().normalize("keb", humanQuery);
+        BytesRef rebQuery = JapaneseLuceneDirectory.getJmdictAnalyzer().normalize("reb", humanQuery);
 
         if(HAN_PATTERN.matcher(humanQuery).find()) {
             return new QueryChain(kebQueryConstructor.apply(kebQuery), KEB_SORT, null);
@@ -136,7 +131,7 @@ public final class QueryChainParser {
                 return new QueryChain(rebQueryConstructor.apply(rebQuery), REB_SORT, null);
             } else {
                 ArrayList<String> senseTerms = new ArrayList<>();
-                try(TokenStream queryStream = Jmdict.getJmdictAnalyzer().tokenStream("gloss", humanQuery)) {
+                try(TokenStream queryStream = JapaneseLuceneDirectory.getJmdictAnalyzer().tokenStream("gloss", humanQuery)) {
                     CharTermAttribute termAttribute = queryStream.addAttribute(CharTermAttribute.class);
 
                     queryStream.reset();

@@ -21,8 +21,8 @@ import org.xml.sax.SAXException;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import tf.bug.jmdict.JishoCommand;
-import tf.bug.jmdict.Jmdict;
+import tf.bug.japanese.JishoCommand;
+import tf.bug.japanese.JapaneseLuceneDirectory;
 
 public class Main {
     private static final Logger LOG = Loggers.getLogger(Main.class);
@@ -41,16 +41,27 @@ public class Main {
             throw new IllegalArgumentException("Invalid program arguments", e);
         }
 
-        String token = prop.getProperty("discord.token");
-
-        String jmdictEGz = prop.getProperty("jmdict.jmdict_e_gz_uri");
-        URI jmdictEGzUri = URI.create(jmdictEGz);
         Directory jmdict;
-        try (HttpClient jmdictClient = HttpClient.newBuilder().build()) {
-            jmdict = Jmdict.downloadAndSaturateInMemoryStore(jmdictClient, jmdictEGzUri);
+        try (HttpClient uriReaderClient = HttpClient.newBuilder().build()) {
+            UriReader uriReader = new UriReader(uriReaderClient);
+
+            String jmdictEGz = prop.getProperty("jmdict.jmdict_e_gz_uri");
+            URI jmdictEGzUri = URI.create(jmdictEGz);
+
+            String freqCc100 = prop.getProperty("freq_cc100.freq_cc100_json_uri");
+            URI freqCc100Uri = URI.create(freqCc100);
+
+            try(InputStream jmdictBody = uriReader.open(jmdictEGzUri);
+                InputStream freqCc100Data = uriReader.open(freqCc100Uri)) {
+                jmdict = JapaneseLuceneDirectory.of(jmdictBody, freqCc100Data);
+            }
+
+
         } catch (IOException | InterruptedException | SAXException | ParserConfigurationException e) {
             throw new RuntimeException(e);
         }
+
+        String token = prop.getProperty("discord.token");
 
         DiscordClient client = DiscordClient.builder(token)
                 .build();

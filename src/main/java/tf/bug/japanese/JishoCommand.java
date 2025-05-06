@@ -1,4 +1,4 @@
-package tf.bug.jmdict;
+package tf.bug.japanese;
 
 import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
