@@ -22,20 +22,21 @@ public final record QueryResponse(
         ChatInputInteractionEvent event,
         UUID uuid,
         String query,
-        List<Document> entries,
+        List<List<Document>> pages,
         int page,
-        int totalPages,
         Instant timeToDie
 ) {
-    public static final int PAGE_SIZE = 3;
+    public static int PAGE_LINE_LENGTH = 11;
+
+    public static int linesInDocument(Document document) {
+        return 1 + document.getValues("sense").length;
+    }
 
     public EmbedCreateSpec makeEmbed() {
-        int start = QueryResponse.PAGE_SIZE * this.page();
-        int end = start + QueryResponse.PAGE_SIZE;
-
         ArrayList<EmbedCreateFields.Field> fields = new ArrayList<>();
-        for (int i = start; i < end && i < this.entries().size(); i++) {
-            Document doc = this.entries().get(i);
+
+        List<Document> page = this.pages().get(this.page());
+        for (Document doc : page) {
             // TODO consider reb exclusions
             String[] writings = doc.getValues("keb");
             String[] readings = doc.getValues("reb");
@@ -82,7 +83,7 @@ public final record QueryResponse(
                 .title("`%s` (Page %d/%d)".formatted(
                         this.query(),
                         1 + this.page(),
-                        this.totalPages()
+                        this.pages().size()
                 ))
                 .addAllFields(fields)
                 .build();
@@ -101,7 +102,7 @@ public final record QueryResponse(
 
         return ActionRow.of(
                 left.disabled(friendlyPage <= 1),
-                right.disabled(friendlyPage >= this.totalPages())
+                right.disabled(friendlyPage >= this.pages().size())
         );
     }
 
@@ -110,9 +111,8 @@ public final record QueryResponse(
                 this.event(),
                 this.uuid(),
                 this.query(),
-                this.entries(),
+                this.pages(),
                 newPage,
-                this.totalPages(),
                 timeToDie
         );
     }

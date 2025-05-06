@@ -56,7 +56,6 @@ public class Main {
                 .build();
 
         List<Command> commandList = List.of(
-//                PingCommand.INSTANCE,
                 new JishoCommand(jmdict)
         );
 

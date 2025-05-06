@@ -141,7 +141,9 @@ public final class JishoCommand extends Command {
 
         QueryChain chain = QueryChainParser.parse(q);
 
-        final ArrayList<Document> resultsReified;
+        final ArrayList<List<Document>> resultsReified = new ArrayList<>();
+        final ArrayList<Document> pageAccumulator = new ArrayList<>();
+        int lineTotal = 0;
 
         try(IndexReader ir = DirectoryReader.open(this.jmdict)) {
             IndexSearcher is = new IndexSearcher(ir);
@@ -159,10 +161,16 @@ public final class JishoCommand extends Command {
                         .build()).then();
             }
 
-            resultsReified = new ArrayList<>();
-
             for(ScoreDoc sd : results.scoreDocs) {
-                resultsReified.add(sf.document(sd.doc));
+                Document doc = sf.document(sd.doc);
+                lineTotal += QueryResponse.linesInDocument(doc);
+                pageAccumulator.add(doc);
+
+                if(lineTotal > QueryResponse.PAGE_LINE_LENGTH) {
+                    resultsReified.add(List.copyOf(pageAccumulator));
+                    pageAccumulator.clear();
+                    lineTotal = 0;
+                }
             }
 
             // TODO replace this with further page searches on request
@@ -176,8 +184,19 @@ public final class JishoCommand extends Command {
             );
 
             for (ScoreDoc sd : rest.scoreDocs) {
-                resultsReified.add(sf.document(sd.doc));
+                Document doc = sf.document(sd.doc);
+                lineTotal += QueryResponse.linesInDocument(doc);
+                pageAccumulator.add(doc);
+
+                if(lineTotal > QueryResponse.PAGE_LINE_LENGTH) {
+                    resultsReified.add(List.copyOf(pageAccumulator));
+                    pageAccumulator.clear();
+                    lineTotal = 0;
+                }
             }
+
+            resultsReified.add(List.copyOf(pageAccumulator));
+            pageAccumulator.clear();
         } catch (IOException e) {
             ByteArrayOutputStream grabExceptionPrint = new ByteArrayOutputStream();
             PrintStream ps = new PrintStream(grabExceptionPrint, false, StandardCharsets.UTF_8);
@@ -200,7 +219,6 @@ public final class JishoCommand extends Command {
                 q,
                 resultsReified,
                 0,
-                Math.ceilDiv(resultsReified.size(), QueryResponse.PAGE_SIZE),
                 timeToDie
         );
 

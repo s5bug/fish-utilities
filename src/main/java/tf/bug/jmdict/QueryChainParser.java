@@ -1,11 +1,13 @@
 package tf.bug.jmdict;
 
+import java.util.List;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.BytesTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queries.function.FunctionScoreQuery;
 import org.apache.lucene.search.*;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
@@ -36,23 +38,45 @@ public final class QueryChainParser {
             Pattern.compile("[*?]");
 
     // TODO sort KEB searches by
-    // 1. length of keb with exact match
-    // 2. commonality of entry
+    // 1. keb with exact match (boolean)
+    // 2. commonality of entry (int)
     // 3. Lucene score
     private static final Sort KEB_SORT =
             new Sort(SortField.FIELD_SCORE);
 
+    private static Query generateKebPrefixQuery(BytesRef kebPrefix) {
+        Query exactMatch = new BoostQuery(new TermQuery(new Term("keb", kebPrefix)), 10.0f);
+        Query prefixMatch = new PrefixQuery(new Term("keb", kebPrefix));
+
+        return new DisjunctionMaxQuery(List.of(exactMatch, prefixMatch), 0.0f);
+    }
+
+    private static Query generateKebWildcardQuery(BytesRef kebWildcard) {
+        return new WildcardQuery(new Term("keb", kebWildcard));
+    }
+
     // TODO sort REB searches by
-    // 1. length of reb with exact match
-    // 2. commonality of entry
+    // 1. reb with exact match (boolean)
+    // 2. commonality of entry (int)
     // 3. Lucene score
     private static final Sort REB_SORT =
             new Sort(SortField.FIELD_SCORE);
 
+    private static Query generateRebPrefixQuery(BytesRef rebPrefix) {
+        Query exactMatch = new BoostQuery(new TermQuery(new Term("reb", rebPrefix)), 10.0f);
+        Query prefixMatch = new PrefixQuery(new Term("reb", rebPrefix));
+
+        return new DisjunctionMaxQuery(List.of(exactMatch, prefixMatch), 0.0f);
+    }
+
+    private static Query generateRebWildcardQuery(BytesRef rebWildcard) {
+        return new WildcardQuery(new Term("reb", rebWildcard));
+    }
+
     // TODO sort Gloss searches by
-    // 1. exact match trumps all
-    // 2. <pri> matches
-    // 3. commonality of entry
+    // 1. exact match (boolean)
+    // 2. <pri> matches (boolean)
+    // 3. commonality of entry (int)
     // 4. Lucene score
     private static final Sort GLOSS_SORT =
             new Sort(SortField.FIELD_SCORE);
@@ -76,12 +100,13 @@ public final class QueryChainParser {
     public static QueryChain parse(String humanQuery) {
         humanQuery = humanQuery.trim();
 
-        boolean appendGlob = true;
+        boolean useWildcardQuery = false;
         if(NON_SIMPLE_PATTERN.matcher(humanQuery).find()) {
-            appendGlob = false;
+            useWildcardQuery = true;
         }
 
-        final Function<? super Term, ? extends Query> jpQueryConstructor;
+        final Function<? super BytesRef, ? extends Query> kebQueryConstructor;
+        final Function<? super BytesRef, ? extends Query> rebQueryConstructor;
         final BiFunction<? super String, ? super String[], ? extends Query> enQueryConstructor = PhraseQuery::new;
 
         boolean isQuoted = QUOTED.matcher(humanQuery).matches();
@@ -89,38 +114,26 @@ public final class QueryChainParser {
             // We don't use a capture group here to potentially save copies inside of Matcher
             humanQuery = humanQuery.substring(1, humanQuery.length() - 1);
             // And we should interpret everything as literal
-            jpQueryConstructor = TermQuery::new;
-            appendGlob = false;
+            kebQueryConstructor = term -> new TermQuery(new Term("keb", term));
+            rebQueryConstructor = term -> new TermQuery(new Term("reb", term));
+        } else if(useWildcardQuery) {
+            kebQueryConstructor = QueryChainParser::generateKebWildcardQuery;
+            rebQueryConstructor = QueryChainParser::generateRebWildcardQuery;
         } else {
-            jpQueryConstructor = WildcardQuery::new;
+            kebQueryConstructor = QueryChainParser::generateKebPrefixQuery;
+            rebQueryConstructor = QueryChainParser::generateRebPrefixQuery;
         }
 
-        BytesRef kebQuery;
-        BytesRef rebQuery;
-        if(appendGlob) {
-            BytesRefBuilder kebBuilder = new BytesRefBuilder();
-            kebBuilder.append(Jmdict.getJmdictAnalyzer().normalize("keb", humanQuery));
-            kebBuilder.append(new BytesRef("*"));
-            kebQuery = kebBuilder.get();
-
-            BytesRefBuilder rebBuilder = new BytesRefBuilder();
-            rebBuilder.append(Jmdict.getJmdictAnalyzer().normalize("reb", humanQuery));
-            rebBuilder.append(new BytesRef("*"));
-            rebQuery = rebBuilder.get();
-        } else {
-            kebQuery = Jmdict.getJmdictAnalyzer().normalize("keb", humanQuery);
-            rebQuery = Jmdict.getJmdictAnalyzer().normalize("reb", humanQuery);
-        }
+        BytesRef kebQuery = Jmdict.getJmdictAnalyzer().normalize("keb", humanQuery);
+        BytesRef rebQuery = Jmdict.getJmdictAnalyzer().normalize("reb", humanQuery);
 
         if(HAN_PATTERN.matcher(humanQuery).find()) {
-            Term term = new Term("keb", kebQuery);
-            return new QueryChain(jpQueryConstructor.apply(term), KEB_SORT, null);
+            return new QueryChain(kebQueryConstructor.apply(kebQuery), KEB_SORT, null);
         } else {
             boolean latinMatches = LATIN_PATTERN.matcher(humanQuery).find();
             boolean kanaMatches = KANA_PATTERN.matcher(humanQuery).find();
             if(kanaMatches && !latinMatches) {
-                Term term = new Term("reb", rebQuery);
-                return new QueryChain(jpQueryConstructor.apply(term), REB_SORT, null);
+                return new QueryChain(rebQueryConstructor.apply(rebQuery), REB_SORT, null);
             } else {
                 ArrayList<String> senseTerms = new ArrayList<>();
                 try(TokenStream queryStream = Jmdict.getJmdictAnalyzer().tokenStream("gloss", humanQuery)) {
@@ -138,10 +151,9 @@ public final class QueryChainParser {
 
                 String[] arr = new String[senseTerms.size()];
                 Query senseQuery = enQueryConstructor.apply("gloss", senseTerms.toArray(arr));
-                Term kebTerm = new Term("keb", kebQuery);
                 // TODO perform romanized reb search
                 return new QueryChain(
-                        jpQueryConstructor.apply(kebTerm),
+                        kebQueryConstructor.apply(kebQuery),
                         KEB_SORT,
                         new QueryChain(senseQuery, GLOSS_SORT, null)
                 );
