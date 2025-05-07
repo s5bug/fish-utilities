@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("application")
 }
 
 group = "tf.bug"
@@ -21,6 +22,16 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+}
+
+tasks.withType<Jar> {
+    manifest {
+        attributes["Main-Class"] = "tf.bug.Main"
+    }
+}
+
+application {
+    mainClass = "tf.bug.Main"
 }
 
 tasks.test {
