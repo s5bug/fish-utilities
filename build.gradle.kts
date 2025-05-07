@@ -31,6 +31,7 @@ tasks.withType<Jar> {
 }
 
 application {
+    applicationDefaultJvmArgs = listOf("-DentityExpansionLimit=2560000", "-Djdk.xml.totalEntitySizeLimit=512000000")
     mainClass = "tf.bug.Main"
 }
 
