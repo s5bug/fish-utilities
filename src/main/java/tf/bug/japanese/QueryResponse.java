@@ -1,5 +1,6 @@
 package tf.bug.japanese;
 
+import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.component.ActionRow;
 import discord4j.core.object.component.Button;
@@ -14,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import tf.bug.FishUtilities;
 
 public final record QueryResponse(
         ChatInputInteractionEvent event,
@@ -29,7 +31,7 @@ public final record QueryResponse(
         return 1 + document.getValues("sense").length;
     }
 
-    public EmbedCreateSpec makeEmbed() {
+    public EmbedCreateSpec makeEmbed(Snowflake selfCommandId) {
         ArrayList<EmbedCreateFields.Field> fields = new ArrayList<>();
 
         List<Document> page = this.pages().get(this.page());
@@ -63,9 +65,44 @@ public final record QueryResponse(
 
             StringBuilder description = new StringBuilder();
             for (int j = 0; j < senses.length; j++) {
-                description.append(j);
+                description.append(1 + j);
                 description.append(". ");
                 description.append(senses[j]);
+
+                String[] partsOfSpeech = doc.getValues("pos-%d".formatted(j));
+                if (partsOfSpeech.length > 0) {
+                    description.append(" [");
+                    for (String pos : partsOfSpeech) {
+                        description.append(pos);
+                        description.append(", ");
+                    }
+                    description.setLength(description.length() - 2);
+                    description.append("]");
+                }
+
+                String[] sInfs = doc.getValues("s_inf-%d".formatted(j));
+                if (sInfs.length > 0) {
+                    description.append(" _");
+                    for (String sInf : sInfs) {
+                        description.append(sInf);
+                        description.append(", ");
+                    }
+                    description.setLength(description.length() - 2);
+                    description.append("_");
+                }
+
+                String[] xRefs = doc.getValues("xref-%d".formatted(j));
+                if (xRefs.length > 0) {
+                    description.append(" (See also: ");
+                    for (String xRef : xRefs) {
+                        description.append("`");
+                        description.append(xRef);
+                        description.append("`, ");
+                    }
+                    description.setLength(description.length() - 2);
+                    description.append(")");
+                }
+
                 description.append("\n");
             }
 
@@ -114,18 +151,18 @@ public final record QueryResponse(
         );
     }
 
-    InteractionFollowupCreateSpec makeInitialFollowup(BiFunction<? super UUID, ? super String, ? extends String> makeButtonId) {
+    InteractionFollowupCreateSpec makeInitialFollowup(FishUtilities client, BiFunction<? super UUID, ? super String, ? extends String> makeButtonId) {
         return InteractionFollowupCreateSpec.builder()
-                .addEmbed(this.makeEmbed())
+                .addEmbed(this.makeEmbed(client.commandIds.get(JishoCommand.ID)))
                 .addComponent(this.makeActionRow(makeButtonId))
                 .build();
     }
 
-    InteractionReplyEditSpec makeReplyEdit(BiFunction<? super UUID, ? super String, ? extends String> makeButtonId, boolean withActions) {
+    InteractionReplyEditSpec makeReplyEdit(FishUtilities client, BiFunction<? super UUID, ? super String, ? extends String> makeButtonId, boolean withActions) {
         InteractionReplyEditSpec.Builder b =
                 InteractionReplyEditSpec.builder();
 
-        b.addEmbed(this.makeEmbed());
+        b.addEmbed(this.makeEmbed(client.commandIds.get(JishoCommand.ID)));
         if (withActions) b.componentsOrNull(this.makeActionRow(makeButtonId));
         else b.componentsOrNull();
 

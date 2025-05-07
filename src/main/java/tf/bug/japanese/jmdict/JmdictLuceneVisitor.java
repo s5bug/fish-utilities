@@ -1,6 +1,7 @@
 package tf.bug.japanese.jmdict;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.lucene.document.*;
@@ -16,6 +17,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
     private final Map<String, Set<FreqCc100.Entry>> kebLookup;
     private Document document;
     private final StringBuilder senseColumnBuilder;
+    private int senseIndex;
 
     public JmdictLuceneVisitor(IndexWriter writer, FreqCc100 frequencyInfo) {
         this.writer = writer;
@@ -23,6 +25,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
         this.kebLookup = this.frequencyInfo.kebLookupMap();
         this.document = null;
         this.senseColumnBuilder = new StringBuilder();
+        this.senseIndex = 0;
     }
 
     @Override
@@ -37,6 +40,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
 
     @Override
     public void enterEntry() {
+        assert this.senseIndex == 0;
         this.document = new Document();
     }
 
@@ -72,6 +76,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
             }
 
             this.document.add(new NumericDocValuesField("frequency", frequency));
+            this.senseIndex = 0;
 
             this.writer.addDocument(this.document);
             this.document = null;
@@ -158,6 +163,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
         this.senseColumnBuilder.setLength(this.senseColumnBuilder.length() - 2);
         this.document.add(new TextField("sense", this.senseColumnBuilder.toString(), Field.Store.YES));
 
+        this.senseIndex++;
         this.senseColumnBuilder.setLength(0);
     }
 
@@ -173,7 +179,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
 
     @Override
     public void visitXref(String xref) {
-        // do nothing
+        this.document.add(new TextField("xref-%d".formatted(this.senseIndex), xref, Field.Store.YES));
     }
 
     @Override
@@ -183,7 +189,7 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
 
     @Override
     public void visitPos(String pos) {
-        // do nothing
+        this.document.add(new TextField("pos-%d".formatted(this.senseIndex), pos, Field.Store.YES));
     }
 
     @Override
@@ -242,6 +248,6 @@ public final class JmdictLuceneVisitor extends JmdictVisitor {
 
     @Override
     public void visitSInf(String sInf) {
-
+        this.document.add(new TextField("s_inf-%d".formatted(this.senseIndex), sInf, Field.Store.YES));
     }
 }

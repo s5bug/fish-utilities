@@ -15,9 +15,9 @@ public abstract class Command {
     public abstract String id();
     public abstract ApplicationCommandRequest register(String id);
 
-    public abstract Mono<Void> handleSlashCommand(final GatewayDiscordClient client, final ChatInputInteractionEvent event);
+    public abstract Mono<Void> handleSlashCommand(final FishUtilities client, final ChatInputInteractionEvent event);
 
-    public Mono<Void> handleButton(final GatewayDiscordClient client, final ButtonInteractionEvent event) {
+    public Mono<Void> handleButton(final FishUtilities client, final ButtonInteractionEvent event) {
         return Mono.empty();
     }
 

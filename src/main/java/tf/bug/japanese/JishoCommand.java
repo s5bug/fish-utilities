@@ -29,6 +29,7 @@ import org.apache.lucene.store.Directory;
 import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import tf.bug.Command;
+import tf.bug.FishUtilities;
 
 public final class JishoCommand extends Command {
     public static final String ID = "jisho";
@@ -89,7 +90,7 @@ public final class JishoCommand extends Command {
     }
 
     @Override
-    public Mono<Void> handleButton(GatewayDiscordClient client, ButtonInteractionEvent event) {
+    public Mono<Void> handleButton(FishUtilities client, ButtonInteractionEvent event) {
         String data = this.dataOfButton(event.getCustomId());
         UUID target = this.uuidOfButton(event.getCustomId());
         QueryResponse newResponse =
@@ -97,17 +98,17 @@ public final class JishoCommand extends Command {
 
             if(newResponse != null) {
                 this.interactionMessages.putIfAbsent(target, event.getMessageId());
-                return this.edit(event, newResponse);
+                return this.edit(client, event, newResponse);
             }
             else return Mono.empty();
     }
 
     @Override
-    public Mono<Void> handleSlashCommand(GatewayDiscordClient client, ChatInputInteractionEvent event) {
+    public Mono<Void> handleSlashCommand(FishUtilities client, ChatInputInteractionEvent event) {
         var a = event.deferReply();
         Mono<Void> b;
         try {
-            b = followup(event);
+            b = followup(client, event);
             return a.then(b);
         } catch (Exception e) {
             e.printStackTrace();
@@ -136,7 +137,7 @@ public final class JishoCommand extends Command {
     private static final Duration TIMEOUT =
             Duration.of(5L, ChronoUnit.MINUTES);
 
-    public Mono<Void> followup(ChatInputInteractionEvent event) {
+    public Mono<Void> followup(FishUtilities client, ChatInputInteractionEvent event) {
         String q = event.getOptionAsString("query").get();
 
         QueryChain chain = QueryChainParser.parse(q);
@@ -224,22 +225,22 @@ public final class JishoCommand extends Command {
 
         interactionMap.put(entryUuid, initialResponse);
 
-        return event.createFollowup(initialResponse.makeInitialFollowup(this::makeButtonId))
+        return event.createFollowup(initialResponse.makeInitialFollowup(client, this::makeButtonId))
                 .flatMap(msg -> {
                     interactionMessages.put(entryUuid, msg.getId());
                     return Mono.empty();
                 })
-                .then(this.tryToDie(entryUuid));
+                .then(this.tryToDie(client, entryUuid));
     }
 
-    Mono<Void> edit(ButtonInteractionEvent event, QueryResponse newResponse) {
-        InteractionReplyEditSpec s = newResponse.makeReplyEdit(this::makeButtonId, true);
+    Mono<Void> edit(FishUtilities client, ButtonInteractionEvent event, QueryResponse newResponse) {
+        InteractionReplyEditSpec s = newResponse.makeReplyEdit(client, this::makeButtonId, true);
 
         return newResponse.event().editFollowup(event.getMessageId(), s)
                 .then(event.deferEdit());
     }
 
-    Mono<Void> tryToDie(UUID interaction) {
+    Mono<Void> tryToDie(FishUtilities client, UUID interaction) {
         QueryResponse retrieved = interactionMap.get(interaction);
         if(retrieved == null) return Mono.empty();
         else {
@@ -247,7 +248,7 @@ public final class JishoCommand extends Command {
             Instant now = Instant.now();
             if(now.isAfter(deathTime)) {
                 InteractionReplyEditSpec withoutButtons =
-                        retrieved.makeReplyEdit(this::makeButtonId, false);
+                        retrieved.makeReplyEdit(client, this::makeButtonId, false);
                 return retrieved.event().editFollowup(
                         this.interactionMessages.get(retrieved.uuid()),
                         withoutButtons
@@ -260,11 +261,11 @@ public final class JishoCommand extends Command {
                         interactionMessages.remove(retrieved.uuid());
                         return Mono.empty();
                     }
-                    else return tryToDie(interaction);
+                    else return tryToDie(client, interaction);
                 });
             } else {
                 return Mono.delay(Duration.between(now, deathTime))
-                        .then(Mono.defer(() -> tryToDie(interaction)));
+                        .then(Mono.defer(() -> tryToDie(client, interaction)));
             }
         }
     }
