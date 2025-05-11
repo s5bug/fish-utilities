@@ -15,7 +15,7 @@ dependencies {
     implementation("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")
 
     implementation("org.apache.lucene:lucene-core:10.2.0")
-    implementation("org.apache.lucene:lucene-analysis-common:10.2.0")
+    implementation("org.apache.lucene:lucene-analysis-common:10.2.1")
     implementation("org.apache.lucene:lucene-queryparser:10.2.0")
 
     compileOnly("org.jetbrains:annotations:26.0.2")
