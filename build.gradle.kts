@@ -16,7 +16,7 @@ dependencies {
 
     implementation("org.apache.lucene:lucene-core:10.2.0")
     implementation("org.apache.lucene:lucene-analysis-common:10.2.0")
-    implementation("org.apache.lucene:lucene-queryparser:10.2.0")
+    implementation("org.apache.lucene:lucene-queryparser:10.2.1")
 
     compileOnly("org.jetbrains:annotations:26.0.2")
 
