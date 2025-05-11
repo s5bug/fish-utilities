@@ -14,10 +14,9 @@ repositories {
 dependencies {
     implementation("com.discord4j:discord4j-core:3.3.0-SNAPSHOT")
 
-    val luceneVersion = "10.2.0"
-    implementation("org.apache.lucene:lucene-core:$luceneVersion")
-    implementation("org.apache.lucene:lucene-analysis-common:$luceneVersion")
-    implementation("org.apache.lucene:lucene-queryparser:$luceneVersion")
+    implementation(libs.lucene.core)
+    implementation(libs.lucene.analysis.common)
+    implementation(libs.lucene.queryparser)
 
     compileOnly("org.jetbrains:annotations:26.0.2")
 
