@@ -1,4 +1,4 @@
-package tf.bug.japanese.jmdict;
+package tf.bug.fishutils.japanese.jmdict;
 
 // TODO generate this from DTD
 public abstract class JmdictVisitor {

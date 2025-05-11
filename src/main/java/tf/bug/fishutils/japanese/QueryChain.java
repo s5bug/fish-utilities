@@ -1,4 +1,4 @@
-package tf.bug.japanese;
+package tf.bug.fishutils.japanese;
 
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;

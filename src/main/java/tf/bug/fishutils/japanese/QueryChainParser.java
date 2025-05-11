@@ -1,4 +1,4 @@
-package tf.bug.japanese;
+package tf.bug.fishutils.japanese;
 
 import java.util.List;
 import org.apache.lucene.analysis.TokenStream;

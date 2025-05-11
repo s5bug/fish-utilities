@@ -1,4 +1,4 @@
-package tf.bug.japanese;
+package tf.bug.fishutils.japanese;
 
 import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
-import tf.bug.FishUtilities;
+import tf.bug.fishutils.FishUtilities;
 
 public final record QueryResponse(
         ChatInputInteractionEvent event,

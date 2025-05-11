@@ -1,7 +1,6 @@
-package tf.bug.japanese;
+package tf.bug.fishutils.japanese;
 
 import discord4j.common.util.Snowflake;
-import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.spec.EmbedCreateSpec;
@@ -28,8 +27,8 @@ import org.apache.lucene.search.*;
 import org.apache.lucene.store.Directory;
 import org.jetbrains.annotations.Nullable;
 import reactor.core.publisher.Mono;
-import tf.bug.Command;
-import tf.bug.FishUtilities;
+import tf.bug.fishutils.Command;
+import tf.bug.fishutils.FishUtilities;
 
 public final class JishoCommand extends Command {
     public static final String ID = "jisho";

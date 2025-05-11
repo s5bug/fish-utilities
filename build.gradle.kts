@@ -26,13 +26,13 @@ dependencies {
 
 tasks.withType<Jar> {
     manifest {
-        attributes["Main-Class"] = "tf.bug.Main"
+        attributes["Main-Class"] = "tf.bug.fishutils.Main"
     }
 }
 
 application {
     applicationDefaultJvmArgs = listOf("-DentityExpansionLimit=2560000", "-Djdk.xml.totalEntitySizeLimit=512000000")
-    mainClass = "tf.bug.Main"
+    mainClass = "tf.bug.fishutils.Main"
 }
 
 tasks.test {

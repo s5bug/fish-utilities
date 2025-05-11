@@ -1,14 +1,12 @@
-package tf.bug.japanese.jmdict;
+package tf.bug.fishutils.japanese.jmdict;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.lucene.document.*;
 import org.apache.lucene.index.IndexWriter;
 
 import java.io.IOException;
-import tf.bug.japanese.freqcc100.FreqCc100;
+import tf.bug.fishutils.japanese.freqcc100.FreqCc100;
 
 // TODO handle tags and reading exclusions
 public final class JmdictLuceneVisitor extends JmdictVisitor {

@@ -1,4 +1,4 @@
-package tf.bug.japanese;
+package tf.bug.fishutils.japanese;
 
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,9 +22,9 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.xml.sax.SAXException;
-import tf.bug.japanese.freqcc100.FreqCc100;
-import tf.bug.japanese.jmdict.JmdictLuceneVisitor;
-import tf.bug.japanese.jmdict.JmdictVisitorSAXAdapter;
+import tf.bug.fishutils.japanese.freqcc100.FreqCc100;
+import tf.bug.fishutils.japanese.jmdict.JmdictLuceneVisitor;
+import tf.bug.fishutils.japanese.jmdict.JmdictVisitorSAXAdapter;
 
 public final class JapaneseLuceneDirectory {
     private final InputStream jmdictEGz;

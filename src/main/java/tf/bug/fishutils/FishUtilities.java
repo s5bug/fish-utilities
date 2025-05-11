@@ -1,11 +1,10 @@
-package tf.bug;
+package tf.bug.fishutils;
 
 import discord4j.common.util.Snowflake;
 import discord4j.core.GatewayDiscordClient;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.lucene.store.Directory;
-import tf.bug.japanese.JapaneseLuceneDirectory;
 
 public final class FishUtilities {
 

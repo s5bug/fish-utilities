@@ -1,4 +1,4 @@
-package tf.bug;
+package tf.bug.fishutils;
 
 import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
@@ -17,13 +17,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 import javax.xml.parsers.ParserConfigurationException;
-import org.apache.lucene.store.Directory;
+
 import org.xml.sax.SAXException;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import tf.bug.japanese.JishoCommand;
-import tf.bug.japanese.JapaneseLuceneDirectory;
+import tf.bug.fishutils.japanese.JishoCommand;
+import tf.bug.fishutils.japanese.JapaneseLuceneDirectory;
 
 public class Main {
     private static final Logger LOG = Loggers.getLogger(Main.class);

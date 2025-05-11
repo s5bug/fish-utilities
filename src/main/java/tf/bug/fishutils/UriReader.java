@@ -1,4 +1,4 @@
-package tf.bug;
+package tf.bug.fishutils;
 
 import java.io.IOException;
 import java.io.InputStream;
