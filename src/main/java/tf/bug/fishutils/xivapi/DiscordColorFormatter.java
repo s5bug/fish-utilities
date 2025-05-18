@@ -138,7 +138,7 @@ public final class DiscordColorFormatter {
     }
 
     private static String setColor(final int discordIdx, final int extendedIdx) {
-        return "\u001b[38;5;%d;48;5;%d;49m".formatted(16 + extendedIdx, 30 + discordIdx);
+        return "\u001b[38;5;%d;48;5;%d;49m".formatted(16 + extendedIdx, 31 + discordIdx);
     }
 
     public static final Pattern COLOR_MATCHER =
