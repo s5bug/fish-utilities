@@ -89,6 +89,9 @@ public class XivActionCommand extends Command {
                         .build())
                 .addOption(ApplicationCommandOptionData.builder()
                         .name("action")
+                        .nameLocalizationsOrNull(Map.of(
+                                "ja", "アクション"
+                        ))
                         .description("Action to display info for")
                         .descriptionLocalizationsOrNull(Map.of(
                                 "ja", "情報が表示されるアクション"
@@ -191,16 +194,34 @@ public class XivActionCommand extends Command {
                     ListOptions.newBuilder().perPage(25).build());
 
             // TODO check language field
+            String language = event.getOption("language")
+                    .flatMap(ApplicationCommandInteractionOption::getValue)
+                    .map(ApplicationCommandInteractionOptionValue::asString)
+                    .orElse(event.getInteraction().getUserLocale());
+
+            String nameIndexer;
+            switch(language) {
+                case "en", "en-US", "en-GB" -> {
+                    nameIndexer = "en";
+                }
+                case "ja" -> {
+                    nameIndexer = "ja";
+                }
+                case "fr" -> {
+                    nameIndexer = "fr";
+                }
+                case "de" -> {
+                    nameIndexer = "de";
+                }
+                default -> {
+                    nameIndexer = "en";
+                }
+            }
+
             List<ApplicationCommandOptionChoiceData> optionsList = actions.stream()
                     .limit(25)
                     .<ApplicationCommandOptionChoiceData>map(action -> ApplicationCommandOptionChoiceData.builder()
-                            .name(action.getName().getEn())
-                            .nameLocalizationsOrNull(Map.of(
-                                    "en-US", action.getName().getEn(),
-                                    "ja", action.getName().getJp(),
-                                    "fr", action.getName().getFr(),
-                                    "de", action.getName().getDe()
-                            ))
+                            .name(action.getName().get(nameIndexer))
                             .value(action.getRowId())
                             .build())
                     .toList();
