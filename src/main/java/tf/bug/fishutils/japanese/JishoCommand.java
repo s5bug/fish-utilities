@@ -3,12 +3,15 @@ package tf.bug.fishutils.japanese;
 import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
+import discord4j.core.object.component.Container;
+import discord4j.core.object.component.TextDisplay;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionFollowupCreateSpec;
 import discord4j.core.spec.InteractionReplyEditSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionData;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 
+import discord4j.rest.util.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -153,11 +156,11 @@ public final class JishoCommand extends Command {
             StoredFields sf = is.storedFields();
 
             if(results == null) {
-                EmbedCreateSpec embed = EmbedCreateSpec.builder()
-                        .description("No results found for query `%s`".formatted(q))
-                        .build();
+                Container container = Container.of(
+                        TextDisplay.of("No results found for query `%s`".formatted(q))
+                );
                 return event.createFollowup(InteractionFollowupCreateSpec.builder()
-                        .addEmbed(embed)
+                        .addComponent(container)
                         .build()).then();
             }
 
@@ -202,12 +205,13 @@ public final class JishoCommand extends Command {
             PrintStream ps = new PrintStream(grabExceptionPrint, false, StandardCharsets.UTF_8);
             e.printStackTrace(ps);
             ps.close();
-            EmbedCreateSpec embed = EmbedCreateSpec.builder()
-                    .description("Error trying to execute query: ```\n%s\n```"
+            Container container = Container.of(
+                    Color.CINNABAR,
+                    TextDisplay.of("Error trying to execute query: ```\n%s\n```"
                             .formatted(grabExceptionPrint.toString(StandardCharsets.UTF_8)))
-                    .build();
+            );
             return event.createFollowup(InteractionFollowupCreateSpec.builder()
-                    .addEmbed(embed)
+                    .addComponent(container)
                     .build()).then();
         }
 

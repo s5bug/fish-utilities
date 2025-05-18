@@ -4,6 +4,7 @@ import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.core.object.command.ApplicationCommandInteractionOption;
 import discord4j.core.object.command.ApplicationCommandInteractionOptionValue;
+import discord4j.core.object.component.*;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionFollowupCreateSpec;
 import discord4j.discordjson.json.ApplicationCommandOptionChoiceData;
@@ -297,15 +298,18 @@ public class XivActionCommand extends Command {
 
         String descriptionAnsi = DiscordColorFormatter.toAnsi(descriptionHtml);
 
+        // TODO use emotes to make sure
+        // XivApiUtil.getBorderlessJobIcon(this.client, jobObject, ImageFormat.PNG).toString() looks like an author
+        // header
         return event.createFollowup(InteractionFollowupCreateSpec.builder()
-                        .addEmbed(EmbedCreateSpec.builder()
-                                .author(
-                                        name,
-                                        null,
-                                        XivApiUtil.getBorderlessJobIcon(this.client, jobObject, ImageFormat.PNG).toString())
-                                .description("```ansi\n%s\n```".formatted(descriptionAnsi))
-                                .thumbnail(action.getIcon().getAssetPathHd().getURI(ImageFormat.PNG).toString())
-                                .build())
+                        .addComponent(Container.of(
+                                Section.of(
+                                        Thumbnail.of(UnfurledMediaItem.of(action.getIcon().getAssetPathHd()
+                                                .getURI(ImageFormat.PNG).toString())),
+                                        TextDisplay.of("**%s**".formatted(name)),
+                                        TextDisplay.of("```ansi\n%s\n```".formatted(descriptionAnsi))
+                                )
+                        ))
                 .build()).then();
     }
 }

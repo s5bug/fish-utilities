@@ -2,8 +2,7 @@ package tf.bug.fishutils.japanese;
 
 import discord4j.common.util.Snowflake;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
-import discord4j.core.object.component.ActionRow;
-import discord4j.core.object.component.Button;
+import discord4j.core.object.component.*;
 import discord4j.core.spec.EmbedCreateFields;
 import discord4j.core.spec.EmbedCreateSpec;
 import discord4j.core.spec.InteractionFollowupCreateSpec;
@@ -31,8 +30,8 @@ public final record QueryResponse(
         return 1 + document.getValues("sense").length;
     }
 
-    public EmbedCreateSpec makeEmbed(Snowflake selfCommandId) {
-        ArrayList<EmbedCreateFields.Field> fields = new ArrayList<>();
+    public Container makeContainer() {
+        ArrayList<ICanBeUsedInContainerComponent> children = new ArrayList<>();
 
         List<Document> page = this.pages().get(this.page());
         for (Document doc : page) {
@@ -106,21 +105,18 @@ public final record QueryResponse(
                 description.append("\n");
             }
 
-            fields.add(EmbedCreateFields.Field.of(
-                    title.toString(),
-                    description.toString(),
-                    false
+            children.add(TextDisplay.of(
+                    "**%s**\n%s".formatted(title.toString(), description.toString())
             ));
         }
 
-        return EmbedCreateSpec.builder()
-                .title("`%s` (Page %d/%d)".formatted(
-                        this.query(),
-                        1 + this.page(),
-                        this.pages().size()
-                ))
-                .addAllFields(fields)
-                .build();
+        return Container.of(
+                    TextDisplay.of("### `%s` (Page %d/%d)".formatted(
+                            this.query(),
+                            1 + this.page(),
+                            this.pages().size()
+                    ))
+                ).withAddedComponents(children);
     }
 
     ActionRow makeActionRow(BiFunction<? super UUID, ? super String, ? extends String> makeButtonId) {
@@ -153,7 +149,7 @@ public final record QueryResponse(
 
     InteractionFollowupCreateSpec makeInitialFollowup(FishUtilities client, BiFunction<? super UUID, ? super String, ? extends String> makeButtonId) {
         return InteractionFollowupCreateSpec.builder()
-                .addEmbed(this.makeEmbed(client.commandIds.get(JishoCommand.ID)))
+                .addComponent(this.makeContainer())
                 .addComponent(this.makeActionRow(makeButtonId))
                 .build();
     }
@@ -162,9 +158,8 @@ public final record QueryResponse(
         InteractionReplyEditSpec.Builder b =
                 InteractionReplyEditSpec.builder();
 
-        b.addEmbed(this.makeEmbed(client.commandIds.get(JishoCommand.ID)));
-        if (withActions) b.componentsOrNull(this.makeActionRow(makeButtonId));
-        else b.componentsOrNull();
+        b.addComponent(this.makeContainer());
+        if (withActions) b.addComponent(this.makeActionRow(makeButtonId));
 
         return b.build();
     }
