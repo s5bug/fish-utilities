@@ -1,6 +1,8 @@
 package tf.bug.fishutils;
 
+import discord4j.core.event.domain.interaction.AutoCompleteInteractionEvent;
 import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
+import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.discordjson.json.ApplicationCommandRequest;
 import reactor.core.publisher.Mono;
@@ -12,6 +14,10 @@ public abstract class Command {
 
     public abstract String id();
     public abstract ApplicationCommandRequest register(String id);
+
+    public Mono<Void> handleAutoComplete(final FishUtilities client, final ChatInputAutoCompleteEvent event) {
+        return Mono.empty();
+    }
 
     public abstract Mono<Void> handleSlashCommand(final FishUtilities client, final ChatInputInteractionEvent event);
 

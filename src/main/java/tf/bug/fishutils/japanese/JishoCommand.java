@@ -105,14 +105,14 @@ public final class JishoCommand extends Command {
     @Override
     public Mono<Void> handleSlashCommand(FishUtilities client, ChatInputInteractionEvent event) {
         var a = event.deferReply();
-        Mono<Void> b;
-        try {
-            b = followup(client, event);
-            return a.then(b);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return a.then(event.editReply(":(")).then();
+        Mono<Void> b = Mono.defer(() -> {
+            try {
+                return followup(client, event);
+            } catch (Exception e) {
+                return event.editReply(":(").then();
+            }
+        });
+        return a.then(b);
     }
 
     private @Nullable TopDocs getNonEmptyResults(IndexSearcher is, QueryChain[] refChain) throws IOException {

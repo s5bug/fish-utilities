@@ -4,8 +4,10 @@ import discord4j.common.util.Snowflake;
 import discord4j.core.DiscordClient;
 import discord4j.core.GatewayDiscordClient;
 import discord4j.core.event.domain.interaction.ButtonInteractionEvent;
+import discord4j.core.event.domain.interaction.ChatInputAutoCompleteEvent;
 import discord4j.core.event.domain.interaction.ChatInputInteractionEvent;
 import discord4j.discordjson.json.ApplicationCommandRequest;
+import gg.xp.xivapi.XivApiClient;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.http.HttpClient;
@@ -16,6 +18,7 @@ import org.xml.sax.SAXException;
 import reactor.core.publisher.Mono;
 import tf.bug.fishutils.japanese.JapaneseLuceneDirectory;
 import tf.bug.fishutils.japanese.JishoCommand;
+import tf.bug.fishutils.xivapi.XivActionCommand;
 
 public final class FishUtilities {
 
@@ -47,10 +50,17 @@ public final class FishUtilities {
             throw new RuntimeException(e);
         }
 
+        XivApiClient xivApiClient = new XivApiClient(builder -> {
+            builder.setBaseUri(properties.xivapiBase());
+        });
+
         DiscordClient client = DiscordClient.builder(properties.discordToken())
                 .build();
 
-        List<Command> commandList = List.of(new JishoCommand(directory));
+        List<Command> commandList = List.of(
+                new JishoCommand(directory),
+                new XivActionCommand(xivApiClient)
+        );
 
         final ArrayList<ApplicationCommandRequest> globalCommands = new ArrayList<>(commandList.size());
         final HashMap<String, Command> commandMap = new HashMap<>();
@@ -77,6 +87,11 @@ public final class FishUtilities {
                                         self.commandIds.put(data.name(), Snowflake.of(data.id()));
                                         return Mono.empty();
                                     }).then()),
+                    gateway.on(ChatInputAutoCompleteEvent.class, event -> {
+                        Command cmd = commandMap.get(event.getCommandName());
+                        if(cmd != null) return cmd.handleAutoComplete(self, event);
+                        else return Mono.empty();
+                    }).then(),
                     gateway.on(ChatInputInteractionEvent.class, event -> {
                         Command cmd = commandMap.get(event.getCommandName());
                         if(cmd != null) return cmd.handleSlashCommand(self, event);
@@ -89,7 +104,7 @@ public final class FishUtilities {
                         else return Mono.empty();
                     }).then()
             );
-        });
+        }).doFinally(_ -> xivApiClient.close());
     }
 
 }
