@@ -7,9 +7,7 @@ import gg.xp.xivapi.clienttypes.XivApiObject;
 import java.util.Map;
 
 @XivApiSheet("ClassJobCategory")
-public interface ClassJobCategory extends XivApiObject {
-    String getName();
-
+public interface ClassJobCategoryJobs extends XivApiObject {
     // Should filter out "Name" field
     @XivApiThis
     @XivApiMapKeys("[A-Z]{3}")

@@ -5,8 +5,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import tf.bug.fishutils.properties.PropertyException;
 import tf.bug.fishutils.properties.PropertyResult;
 
@@ -25,13 +27,8 @@ public class Main {
             throw new IllegalArgumentException("Invalid program arguments", e);
         }
 
-        PropertyResult<FishUtilitiesProperties> properties = FishUtilitiesProperties.ACCESS.apply(key -> {
-            if(!prop.containsKey(key)) {
-                return new PropertyResult.Failure<>(List.of(new PropertyException.PropertyExecptionMissingKey(key)));
-            } else {
-                return new PropertyResult.Success<>(prop.getProperty(key));
-            }
-        });
+        PropertyResult<FishUtilitiesProperties> properties =
+                FishUtilitiesProperties.ACCESS.apply(prop.stringPropertyNames(), prop::getProperty);
 
         switch(properties) {
             case PropertyResult.Success<FishUtilitiesProperties> success -> {

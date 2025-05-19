@@ -22,15 +22,18 @@ import tf.bug.fishutils.xivapi.XivActionCommand;
 
 public final class FishUtilities {
 
-    public GatewayDiscordClient gateway;
-    public Directory directory;
+    public final FishUtilitiesProperties properties;
+    public final GatewayDiscordClient gateway;
+    public final Directory directory;
     public final Map<String, Snowflake> commandIds;
 
     public FishUtilities(
+            FishUtilitiesProperties properties,
             GatewayDiscordClient gateway,
             Directory japaneseLuceneDirectory,
             Map<String, Snowflake> commandIds
     ) {
+        this.properties = properties;
         this.gateway = gateway;
         this.directory = japaneseLuceneDirectory;
         this.commandIds = new HashMap<>();
@@ -51,7 +54,7 @@ public final class FishUtilities {
         }
 
         XivApiClient xivApiClient = new XivApiClient(builder -> {
-            builder.setBaseUri(properties.xivapiBase());
+            builder.setBaseUri(properties.ffXivProperties().xivapiBase());
         });
 
         DiscordClient client = DiscordClient.builder(properties.discordToken())
@@ -75,6 +78,7 @@ public final class FishUtilities {
 
         return client.withGateway(gateway -> {
             final FishUtilities self = new FishUtilities(
+                    properties,
                     gateway,
                     directory,
                     new HashMap<>()

@@ -13,4 +13,10 @@ public interface Action extends XivApiObject {
     XivApiLangValue<String> getDescriptionHtml();
 
     Icon getIcon();
+
+    ClassJobCategoryJobs getClassJobCategory();
+
+    int getCastType();
+    int getRange();
+    int getEffectRange();
 }
