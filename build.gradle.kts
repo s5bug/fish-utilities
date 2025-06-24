@@ -20,7 +20,7 @@ dependencies {
 
     implementation("app.xivgear:xivapi-java:0.1.10")
 
-    implementation("org.jsoup:jsoup:1.20.1")
+    implementation("org.jsoup:jsoup:1.21.1")
 
     compileOnly("org.jetbrains:annotations:26.0.2")
 
