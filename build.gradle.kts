@@ -7,7 +7,7 @@ group = "tf.bug"
 version = "1.0-SNAPSHOT"
 
 repositories {
-    maven(url = "https://oss.sonatype.org/content/repositories/snapshots")
+    maven(url = "https://central.sonatype.com/repository/maven-snapshots")
     mavenCentral()
 }
 
@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.lucene.analysis.common)
     implementation(libs.lucene.queryparser)
 
-    implementation("app.xivgear:xivapi-java:0.1.10")
+    implementation("app.xivgear:xivapi-java:0.1.12")
 
     implementation("org.jsoup:jsoup:1.21.2")
 
