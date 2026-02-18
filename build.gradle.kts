@@ -22,7 +22,7 @@ dependencies {
 
     implementation("org.jsoup:jsoup:1.22.1")
 
-    compileOnly("org.jetbrains:annotations:26.0.2")
+    compileOnly("org.jetbrains:annotations:26.1.0")
 
     testImplementation(platform("org.junit:junit-bom:6.0.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
