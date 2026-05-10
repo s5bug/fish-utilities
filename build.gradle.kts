@@ -12,15 +12,15 @@ repositories {
 }
 
 dependencies {
-    implementation("com.discord4j:discord4j-core:3.3.2-SNAPSHOT")
+    implementation("com.discord4j:discord4j-core:3.3.3-SNAPSHOT")
 
     implementation(libs.lucene.core)
     implementation(libs.lucene.analysis.common)
     implementation(libs.lucene.queryparser)
 
-    implementation("app.xivgear:xivapi-java:0.1.14")
+    implementation("app.xivgear:xivapi-java:0.1.15")
 
-    implementation("org.jsoup:jsoup:1.22.1")
+    implementation("org.jsoup:jsoup:1.22.2")
 
     compileOnly("org.jetbrains:annotations:26.1.0")
 
