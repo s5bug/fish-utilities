@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.lucene.analysis.common)
     implementation(libs.lucene.queryparser)
 
-    implementation("app.xivgear:xivapi-java:0.1.15")
+    implementation("app.xivgear:xivapi-java:0.1.16")
 
     implementation("org.jsoup:jsoup:1.22.2")
 
