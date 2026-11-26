@@ -12,7 +12,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.discord4j:discord4j-core:3.3.3")
+    implementation("com.discord4j:discord4j-core:3.3.4")
 
     implementation(libs.lucene.core)
     implementation(libs.lucene.analysis.common)
